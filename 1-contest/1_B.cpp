@@ -4,20 +4,21 @@
 
 class Solution{
 private:
-    static void preproc(const std::string &text, std::string &new_text){
+    static std::string preproc(const std::string &text){
         //предобработка для того, чтобы не писать для четных и нечетных палиндромов
+        std::string new_text;
         new_text.push_back('|');
 
         for(char symbol : text){
             new_text.push_back(symbol);
             new_text.push_back('|');
         }
+        return new_text;
     }
 public:
-    static void manaker(std::string &old_text){
+    static void manaker(const std::string &old_text){
         //предобработка (abc -> |a|b|c|)
-        std::string text;
-        preproc(old_text, text);
+        std::string text = preproc(old_text);
         //храним и заполняем массивы с первого индекса
         //храним начало и конец найденного на текщий момент палиндрома с самой правой границей
         int32_t left = 0, right = 0;
