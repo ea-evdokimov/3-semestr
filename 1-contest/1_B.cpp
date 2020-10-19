@@ -2,33 +2,43 @@
 #include <string>
 #include <vector>
 
-typedef int32_t i32;
+class Solution{
+private:
+    static std::string preproc(const std::string &text){
+        //предобработка для того, чтобы не писать для четных и нечетных палиндромов
+        std::string new_text;
+        new_text.push_back('|');
 
-struct Solution{
+        for(char symbol : text){
+            new_text.push_back(symbol);
+            new_text.push_back('|');
+        }
+        return new_text;
+    }
 public:
-    void manaker(std::string &text){
+    static void manaker(const std::string &old_text){
         //предобработка (abc -> |a|b|c|)
-        preproc(text);
+        std::string text = preproc(old_text);
         //храним и заполняем массивы с первого индекса
         //храним начало и конец найденного на текщий момент палиндрома с самой правой границей
-        i32 left = 0, right = 0, size;
+        int32_t left = 0, right = 0;
+        uint32_t size = text.size();
         uint64_t result = 0;
-        size = text.size();
 
         //изначально все 1
-        std::vector<i32> max_rad(size, 1);
+        std::vector<int32_t> max_rad(size, 1);
 
-        for(i32 i = 1; i < size; ++i){
-            i32 cur_l, cur_r;
+        for(uint32_t i = 1; i < size; ++i){
+            int32_t cur_l, cur_r;
 
             if(i <= right) {
                 //воспользуемся тем, что уже знаем
-                i32 reversed = right + left - i;
+                int32_t reversed = right + left - i;
                 cur_l = i + 1 - max_rad[reversed], cur_r = i - 1 + max_rad[reversed];
 
                 //если кусочек вылазит(нет информации)
                 if(cur_r > right){
-                    i32 cut = cur_r - right;
+                    int32_t cut = cur_r - right;
                     cur_r -= cut;
                     cur_l += cut;
                 }
@@ -59,19 +69,6 @@ public:
         result -= size / 2;
 
         std::cout << result;
-    }
-
-    void preproc(std::string &text){
-        //предобработка для того, чтобы не писать для четных и нечетных палиндромов
-        std::vector<char> tmp;
-        tmp.push_back('|');
-
-        for(char symbol : text){
-            tmp.push_back(symbol);
-            tmp.push_back('|');
-        }
-
-        text = std::string(tmp.begin(), tmp.end());
     }
 };
 
