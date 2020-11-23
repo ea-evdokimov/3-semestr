@@ -3,36 +3,46 @@
 #include <string>
 #include <map>
 
+char const separator1 = '_';
+char const separator2 = '^';
+
 struct SuffixArray {
+    size_t dif_classes, n;
     std::string input_text;
-    std::vector<int> suf_array;
-    std::vector<size_t> suf_lcp;
+    std::vector<int> suf_array, suf_lcp;
+    std::vector<int> classes, poses, poses_second, classes_second;
+
     //конец первой строки
     int end_first = -1;
 
+    static int const alphabet_size = 26;
+
     //непосредственно построение суф массива
-    void build(std::string &text);
+    SuffixArray(const std::string &text);
 
     //нулевой шаг - сортировка подсчетом первых символов
-    size_t zero_step(std::map<int, std::vector<int>> &indexes, std::vector<int> &pos, std::vector<int> &classes);
+    size_t zero_step(std::map<int, std::vector<int>> &indexes);
 
+    void k_step(std::vector<int> &count, size_t k);
     //наибольший общий префикс
-    std::vector<size_t> LCP();
+    std::vector<int> LCP();
+
+    //нахождение количества различных подстрок
+    size_t dif_substrings();
 
     //нахождение к общей подстроки
-    std::string k_substring(size_t k);
+    std::optional<std::string> k_substring(size_t k);
 
     //из разных ли строк данный префикс суффикса
     bool from_dif_strings(int j);
 };
 
-size_t
-SuffixArray::zero_step(std::map<int, std::vector<int>> &indexes, std::vector<int> &poses, std::vector<int> &classes) {
+size_t SuffixArray::zero_step(std::map<int, std::vector<int>> &indexes) {
     size_t dif_classes = 0, pos_i = 0;
 
-    for (auto pair: indexes) {
+    for (auto [sym, indexes]: indexes) {
         //pair.first -- символ
-        for (auto ind : pair.second) {
+        for (auto ind : indexes) {
             poses[pos_i] = ind;
             ++pos_i;
             classes[ind] = dif_classes;
@@ -44,63 +54,69 @@ SuffixArray::zero_step(std::map<int, std::vector<int>> &indexes, std::vector<int
     return dif_classes;
 }
 
-void SuffixArray::build(std::string &text) {
+void SuffixArray::k_step(std::vector<int> &count, size_t k){
+    //если все суф в разных классах
+    if (dif_classes == n)
+        return;
+
+    std::fill(count.begin(), count.end(), 0);
+    //poses_second - сортировка по вторым частям
+    for (size_t i = 0; i < n; i++)
+        poses_second[i] = (poses[i] + n - (1 << k)) % n;
+
+    //сортировка
+    for (size_t i = 0; i < n; i++) {
+        ++count[classes[poses_second[i]]];
+    }
+
+    for (size_t i = 1; i < dif_classes; ++i)
+        count[i] += count[i - 1];
+
+    for (int i = n - 1; i >= 0; --i) {
+        --count[classes[poses_second[i]]];
+        int cnt = count[classes[poses_second[i]]];
+        poses[cnt] = poses_second[i];
+    }
+
+    //имеем новые позиции, проставим классы
+    classes_second[poses[0]] = 0;
+    dif_classes = 1;
+
+    for (size_t i = 1; i < n; ++i) {
+        int right_2 = (poses[i] + (1 << k)) % n, right_1 = (poses[i - 1] + (1 << k)) % n,
+                left_1 = poses[i - 1], left_2 = poses[i];
+
+        //за O(1) понимаем, в разных классах суффиксы лежат или в одном
+        if (classes[left_1] != classes[left_2] || classes[right_1] != classes[right_2])
+            ++dif_classes;
+
+        classes_second[poses[i]] = dif_classes - 1;
+    }
+    classes.swap(classes_second);
+}
+
+SuffixArray::SuffixArray(const std::string &text) {
     //количество различных классов на данной итерации
-    size_t dif_classes = 0;
+    dif_classes = 0;
     input_text = text;
-    size_t n = text.size();
-    std::vector<int> classes(text.size());
-    std::vector<int> poses(text.size());
+    n = input_text.size();
+
+    poses.resize(n), poses_second.resize(n), classes.resize(n), classes_second.resize(n);
+
     //соответсвие символа и позициям, на которых этот символ встречается
     std::map<int, std::vector<int>> indexes;
-    for (int i = 0; i < n; ++i) {
-        indexes[text[i]].push_back(i);
+    for (size_t i = 0; i < n; ++i) {
+        indexes[input_text[i]].push_back(i);
     }
-    //0 - этап, сортируем по первым 2^0=1 символов
-    dif_classes = zero_step(indexes, poses, classes);
+    //0 - этап, сортируем по первым 2^0=1 символу
+    dif_classes = zero_step(indexes);
 
     //вспомогательные векторы для вторых частей
-    std::vector<int> poses_second(n), classes_second(n), count(n);
+    int count_size = n > alphabet_size ? n : alphabet_size;
 
+    std::vector<int> count(count_size);
     for (size_t k = 0; (1 << k) < n; ++k) {
-        //если все суф в разных классах
-        if (dif_classes == n)
-            break;
-
-        std::fill(count.begin(), count.end(), 0);
-        //poses_second - сортировка по вторым частям
-        for (size_t i = 0; i < n; i++)
-            poses_second[i] = (poses[i] + n - (1 << k)) % n;
-
-        //сортировка
-        for (size_t i = 0; i < n; i++) {
-            ++count[classes[poses_second[i]]];
-        }
-
-        for (size_t i = 1; i < dif_classes; ++i)
-            count[i] += count[i - 1];
-
-        for (int i = n - 1; i >= 0; --i) {
-            --count[classes[poses_second[i]]];
-            int cnt = count[classes[poses_second[i]]];
-            poses[cnt] = poses_second[i];
-        }
-
-        //имеем новые позиции, проставим классы
-        classes_second[poses[0]] = 0;
-        dif_classes = 1;
-
-        for (size_t i = 1; i < n; ++i) {
-            int right_2 = (poses[i] + (1 << k)) % n, right_1 = (poses[i - 1] + (1 << k)) % n;
-            int left_1 = poses[i - 1], left_2 = poses[i];
-            //за O(1) понимаем, в разных классах суффиксы лежат или в одном
-            if (classes[left_1] != classes[left_2] || classes[right_1] != classes[right_2])
-                ++dif_classes;
-
-            classes_second[poses[i]] = dif_classes - 1;
-        }
-
-        classes.swap(classes_second);
+        k_step(count, k);
     }
 
     //теперь в векторе внутри класса хранится наш суф массив
@@ -108,9 +124,9 @@ void SuffixArray::build(std::string &text) {
 }
 
 //алгоритм Касаи
-std::vector<size_t> SuffixArray::LCP() {
+std::vector<int> SuffixArray::LCP() {
     size_t n = input_text.size(), cur = 0;
-    std::vector<size_t> lcp(n - 1);
+    std::vector<int> lcp(n - 1);
     std::vector<int> suf_pos(n);
 
     for (size_t i = 0; i < n; ++i) {
@@ -132,17 +148,14 @@ std::vector<size_t> SuffixArray::LCP() {
             cur = 0;
     }
 
-    suf_lcp.swap(lcp);
+    suf_lcp = std::move(lcp);
     return lcp;
 }
 
 bool SuffixArray::from_dif_strings(int j) {
     //первый раз посчитаем, где стоит разделитель
     if (end_first == -1) {
-        size_t n = input_text.size();
-        for (size_t i = 0; i < n; ++i)
-            if (input_text[i] == '_')
-                end_first = i;
+        end_first = input_text.find(separator1);
     }
 
     //нам подходит, если в одном знак '_' встречается, а в другом - нет
@@ -150,7 +163,7 @@ bool SuffixArray::from_dif_strings(int j) {
            (suf_array[j] < end_first) & (suf_array[j + 1] > end_first);
 }
 
-std::string SuffixArray::k_substring(size_t k) {
+std::optional<std::string> SuffixArray::k_substring(size_t k) {
     size_t n = input_text.size();
     std::string res;
     //текущий минимальный lcp и текущий
@@ -175,7 +188,8 @@ std::string SuffixArray::k_substring(size_t k) {
             break;
         }
     }
-
+    if(res.size() == 0)
+        return std::nullopt;
     return res;
 }
 
@@ -185,44 +199,11 @@ int main() {
     std::cin >> text1 >> text2;
     std::cin >> k;
 
-    std::string text = text1 + '_' + text2 + '^';
-    SuffixArray s;
-    s.build(text);
+    std::string text = text1 + separator1 + text2 + separator2;
+    SuffixArray s(text);
     s.LCP();
 
-    std::string res = s.k_substring(k);
-
-    if (res.length() == 0)
-        std::cout << "-1" << " " << std::endl;
-    else
-        std::cout << res << " " << std::endl;
+    std::cout << s.k_substring(k).value_or("-1") << std::endl;
+    return 0;
 }
-/*
-abab
-cab
-1
-abab
-cab
-2
-abab
-cab
-3
-abab
-cab
-4
-aaa
-abaa
-1
-aaa
-abaa
-2
-aaa
-abaa
-3
-abcd
-abcd
-5
-ddbbc
-aabbc
-4
-*/
+
