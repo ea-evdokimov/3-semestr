@@ -18,7 +18,7 @@ struct SuffixArray {
     //нулевой шаг - сортировка подсчетом первых символов
     size_t zero_step(const std::map<int, std::vector<int>> &indexes);
 
-    std::vector<int> cur_step(size_t k, std::vector<int> &poses_second, std::vector<int> &classes_second);
+    void cur_step(size_t k, std::vector<int> &poses_second, std::vector<int> &classes_second);
     //наибольший общий префикс
     std::vector<int> LCP();
 
@@ -43,10 +43,10 @@ size_t SuffixArray::zero_step(const std::map<int, std::vector<int>> &indexes) {
     return dif_classes;
 }
 
-std::vector<int> SuffixArray::cur_step(size_t k, std::vector<int> &poses_second, std::vector<int> &classes_second) {
+void SuffixArray::cur_step(size_t k, std::vector<int> &poses_second, std::vector<int> &classes_second) {
     //если все суф в разных классах
     if (dif_classes == n)
-        return{};
+        return;
 
     int count_size = n > alphabet_size ? n : alphabet_size;
     std::vector<int> count(count_size);
@@ -84,7 +84,6 @@ std::vector<int> SuffixArray::cur_step(size_t k, std::vector<int> &poses_second,
         classes_second[suf_array[i]] = dif_classes - 1;
     }
     classes.swap(classes_second);
-    return count;
 }
 
 SuffixArray::SuffixArray(const std::string &text) {
