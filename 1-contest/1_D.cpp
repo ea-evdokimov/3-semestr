@@ -3,12 +3,11 @@
 #include <string>
 #include <map>
 
-
 struct SuffixArray {
     size_t dif_classes, n;
     std::string input_text;
     std::vector<int> suf_array, suf_lcp;
-    std::vector<int> classes, poses, poses_second, classes_second;
+    std::vector<int> classes;
 
     static char const separator = '$';
     static int const alphabet_size = 26;
@@ -17,9 +16,9 @@ struct SuffixArray {
     SuffixArray(const std::string &text);
 
     //нулевой шаг - сортировка подсчетом первых символов
-    size_t zero_step(std::map<int, std::vector<int>> &indexes);
+    size_t zero_step(const std::map<int, std::vector<int>> &indexes);
 
-    void k_step(std::vector<int> &count, size_t k);
+    std::vector<int> cur_step(size_t k, std::vector<int> &poses_second, std::vector<int> &classes_second);
     //наибольший общий префикс
     std::vector<int> LCP();
 
@@ -27,15 +26,15 @@ struct SuffixArray {
     size_t dif_substrings();
 };
 
-size_t SuffixArray::zero_step(std::map<int, std::vector<int>> &indexes) {
+size_t SuffixArray::zero_step(const std::map<int, std::vector<int>> &indexes) {
     size_t dif_classes = 0, pos_i = 0;
 
-    for (auto [sym, indexes]: indexes) {
+    for (auto [sym, ind]: indexes) {
         //pair.first -- символ
-        for (auto ind : indexes) {
-            poses[pos_i] = ind;
+        for (auto i : ind) {
+            suf_array[pos_i] = i;
             ++pos_i;
-            classes[ind] = dif_classes;
+            classes[i] = dif_classes;
         }
         //заполнили один класс
         ++dif_classes;
@@ -44,15 +43,17 @@ size_t SuffixArray::zero_step(std::map<int, std::vector<int>> &indexes) {
     return dif_classes;
 }
 
-void SuffixArray::k_step(std::vector<int> &count, size_t k){
+std::vector<int> SuffixArray::cur_step(size_t k, std::vector<int> &poses_second, std::vector<int> &classes_second) {
     //если все суф в разных классах
     if (dif_classes == n)
-        return;
+        return{};
 
-    std::fill(count.begin(), count.end(), 0);
+    int count_size = n > alphabet_size ? n : alphabet_size;
+    std::vector<int> count(count_size);
+
     //poses_second - сортировка по вторым частям
     for (size_t i = 0; i < n; i++)
-        poses_second[i] = (poses[i] + n - (1 << k)) % n;
+        poses_second[i] = (suf_array[i] + n - (1 << k)) % n;
 
     //сортировка
     for (size_t i = 0; i < n; i++) {
@@ -65,24 +66,25 @@ void SuffixArray::k_step(std::vector<int> &count, size_t k){
     for (int i = n - 1; i >= 0; --i) {
         --count[classes[poses_second[i]]];
         int cnt = count[classes[poses_second[i]]];
-        poses[cnt] = poses_second[i];
+        suf_array[cnt] = poses_second[i];
     }
 
     //имеем новые позиции, проставим классы
-    classes_second[poses[0]] = 0;
+    classes_second[suf_array[0]] = 0;
     dif_classes = 1;
 
     for (size_t i = 1; i < n; ++i) {
-        int right_2 = (poses[i] + (1 << k)) % n, right_1 = (poses[i - 1] + (1 << k)) % n,
-                left_1 = poses[i - 1], left_2 = poses[i];
+        int right_2 = (suf_array[i] + (1 << k)) % n, right_1 = (suf_array[i - 1] + (1 << k)) % n,
+                left_1 = suf_array[i - 1], left_2 = suf_array[i];
 
         //за O(1) понимаем, в разных классах суффиксы лежат или в одном
         if (classes[left_1] != classes[left_2] || classes[right_1] != classes[right_2])
             ++dif_classes;
 
-        classes_second[poses[i]] = dif_classes - 1;
+        classes_second[suf_array[i]] = dif_classes - 1;
     }
     classes.swap(classes_second);
+    return count;
 }
 
 SuffixArray::SuffixArray(const std::string &text) {
@@ -92,8 +94,8 @@ SuffixArray::SuffixArray(const std::string &text) {
     input_text += separator;
     n = input_text.size();
 
-    poses.resize(n), poses_second.resize(n), classes.resize(n), classes_second.resize(n);
-
+    suf_array.resize(n), classes.resize(n);
+    std::vector<int> poses_second(n), classes_second(n);
     //соответсвие символа и позициям, на которых этот символ встречается
     std::map<int, std::vector<int>> indexes;
     for (size_t i = 0; i < n; ++i) {
@@ -102,16 +104,9 @@ SuffixArray::SuffixArray(const std::string &text) {
     //0 - этап, сортируем по первым 2^0=1 символу
     dif_classes = zero_step(indexes);
 
-    //вспомогательные векторы для вторых частей
-    int count_size = n > alphabet_size ? n : alphabet_size;
-
-    std::vector<int> count(count_size);
     for (size_t k = 0; (1 << k) < n; ++k) {
-        k_step(count, k);
+        cur_step(k, poses_second, classes_second);
     }
-
-    //теперь в векторе внутри класса хранится наш суф массив
-    suf_array = std::move(poses);
 }
 
 //алгоритм Касаи
@@ -144,7 +139,7 @@ std::vector<int> SuffixArray::LCP() {
 }
 
 size_t SuffixArray::dif_substrings(){
-    //воспользуемсчя посчитанными lcp и suf_array
+    // lcp и suf_array
     size_t res = 0;
 
     for(size_t i = 0; i < n; ++i){
