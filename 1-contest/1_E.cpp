@@ -15,7 +15,7 @@ class SuffixTree {
     //для вывода
     int cur_number;
     //размеры строк
-    int size1, size2;
+    size_t size1, size2;
     Active active{0, 0, 0};
 
     struct Node {
@@ -41,13 +41,14 @@ class SuffixTree {
     std::vector<Node> tree;
 
 public:
-    SuffixTree(std::string &text, int size_1, int size_2) {
-        size1 = size_1, size2 = size_2;
-
-        input_text = text;
+    SuffixTree(const std::string &text1, const std::string &text2) : size1(text1.size()), size2(text2.size()), input_text(text1 + text2) {
         remainder = 0, cur_pos = 0, node_need_suf_link = 0;
         cur_number = 0;
         root = active.node = insert_node(-1, -1);
+
+        for (auto c : input_text) {
+            add_symb(c);
+        }
     }
 
     //добавление суф ссылки
@@ -55,9 +56,6 @@ public:
 
     //вставка узла
     int insert_node(int start, int end);
-
-    //построение дерева
-    void build();
 
     //прохождение вниз
     bool go_down(int cur_node);
@@ -79,11 +77,6 @@ int SuffixTree::insert_node(int start, int end) {
     return tree.size() - 1;
 }
 
-void SuffixTree::build() {
-    for (auto c : input_text) {
-        add_symb(c);
-    }
-}
 
 bool SuffixTree::go_down(int cur_node) {
     if (active.len >= tree[cur_node].len(cur_pos)) {
@@ -185,7 +178,7 @@ void SuffixTree::dfs(int cur_node, int cur_from) {
     ++cur_number;
     cur_from = tree[cur_node].number;
 
-    /////вывод
+    //вывод
     if (cur_node != 0) {
         //родитель
         std::cout << tree[cur_node].parent << " ";
@@ -207,7 +200,7 @@ void SuffixTree::dfs(int cur_node, int cur_from) {
 
         std::cout << '\n';
     }
-    /////
+
     //перебираем детей в лескикограф порядке
     for (auto next : tree[cur_node].children) {
         int next_node = next.second;
@@ -218,36 +211,12 @@ void SuffixTree::dfs(int cur_node, int cur_from) {
 
 int main() {
     std::ios::sync_with_stdio(false);
-    std::string text1, text2, text;
+    std::string text1, text2;
     std::cin >> text1 >> text2;
-    int size1 = text1.size(), size2 = text2.size();
-    text = text1 + text2;
 
-    SuffixTree t(text, size1, size2);
-    t.build();
+    SuffixTree t(text1, text2);
     t.numerate();
+    return 0;
 }
 
-
-/*
- abcadbc$
-*/
-
-/*
- abcad$
- */
-
-/*
- ab$
- ac#
- */
-
-/*
- abc$
- adbc#
- */
-/*
- aba$
-baab#
- */
 
