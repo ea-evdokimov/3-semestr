@@ -5,12 +5,10 @@
 #include <cmath>
 #include <set>
 
-const long double big = 1e50;
-const long double epsilon = 1e-6;
-const long double big_ = 1e9 + 1;
-
 struct Point {
     long double x, y, z;
+    static constexpr double big = 1e50;
+    static constexpr double epsilon = 1e-6;
     int64_t id;
     Point *prev, *next;
 
@@ -49,13 +47,13 @@ class ConvexHull {
 private:
     std::vector<Point *> all_points;
     std::vector<Plane> planes;
-    std::vector<Point *> points_hull_lower, points_hull_upper;
+    static constexpr double big = 1e50;
 public:
-    ConvexHull(std::vector<Point *> &v) {
-        all_points = std::move(v);
+    ConvexHull(std::vector<Point *> &v) : all_points(std::move(v)) {
+        //sort by x
         std::sort(all_points.begin(), all_points.end(), compare);
 
-        points_hull_lower = build_hull(0, all_points.size());
+        std::vector<Point *> points_hull_lower = build_hull(0, all_points.size());
         add_planes(points_hull_lower);
 
         for (Point *p : all_points) {
@@ -63,11 +61,12 @@ public:
             p->next = nullptr;
             p->z *= -1;
         }
-        points_hull_upper = build_hull(0, all_points.size());
+        //similarly
+        std::vector<Point *> points_hull_upper = build_hull(0, all_points.size());
         add_planes(points_hull_upper);
     }
 
-    ~ConvexHull(){
+    ~ConvexHull() {
         for (int i = all_points.size() - 1; i >= 0; --i) {
             delete (all_points[i]);
         }
@@ -111,7 +110,7 @@ public:
         return ((p2->z - p->z) * (p1->x - p->x) - (p2->x - p->x) * (p1->z - p->z)) / a;
     }
 
-    long double answer() const;
+    long double av_edges_voronoi() const;
 };
 
 std::vector<Point *> ConvexHull::build_hull(int64_t left, int64_t right) {
@@ -242,49 +241,42 @@ ConvexHull::hull(const std::vector<Point *> &left, const std::vector<Point *> &r
     return res;
 }
 
-long double ConvexHull::answer() const {
-    std::set<std::pair<int64_t, int64_t>> s;
-    //points connected to inf
+long double ConvexHull::av_edges_voronoi() const {
+    std::set<std::pair<int64_t, int64_t>> edges;
+    //getting points connected to infinity
     std::vector<bool> extreme(all_points.size(), false);
 
     for (auto p : planes) {
         if (p.p1 == -1) {
-            if (p.p2 != -1)
-                extreme[p.p2] = true;
-            if (p.p3 != -1)
-                extreme[p.p3] = true;
-        }
-        if (p.p2 == -1) {
-            if (p.p1 != -1)
-                extreme[p.p1] = true;
-            if (p.p3 != -1)
-                extreme[p.p3] = true;
-        }
-        if (p.p3 == -1) {
-            if (p.p2 != -1)
-                extreme[p.p2] = true;
-            if (p.p1 != -1)
-                extreme[p.p1] = true;
+            extreme[p.p2] = true;
+            extreme[p.p3] = true;
+        } else if (p.p2 == -1) {
+            extreme[p.p1] = true;
+            extreme[p.p3] = true;
+        } else if (p.p3 == -1) {
+            extreme[p.p2] = true;
+            extreme[p.p1] = true;
         }
     }
 
+    //adding normal edges
     for (auto p : planes) {
         //if this plane is inf
         if (p.p1 == -1 || p.p2 == -1 || p.p3 == -1)
             continue;
         else {
             if (!extreme[p.p1] || !extreme[p.p2])
-                s.insert({std::min(p.p1, p.p2), std::max(p.p1, p.p2)});
+                edges.insert({std::min(p.p1, p.p2), std::max(p.p1, p.p2)});
             if (!extreme[p.p1] || !extreme[p.p3])
-                s.insert({std::min(p.p1, p.p3), std::max(p.p1, p.p3)});
+                edges.insert({std::min(p.p1, p.p3), std::max(p.p1, p.p3)});
             if (!extreme[p.p3] || !extreme[p.p2])
-                s.insert({std::min(p.p3, p.p2), std::max(p.p3, p.p2)});
+                edges.insert({std::min(p.p3, p.p2), std::max(p.p3, p.p2)});
         }
     }
-
+    //for every end of normal edge
     std::vector<int64_t> count(all_points.size(), 0);
 
-    for (auto p : s) {
+    for (auto p : edges) {
         if (!extreme[p.first])
             ++count[p.first];
         if (!extreme[p.second])
@@ -292,6 +284,7 @@ long double ConvexHull::answer() const {
     }
 
     long double res = 0.0;
+    //num of sights
     int64_t num = 0;
 
     for (auto c : count) {
@@ -321,11 +314,11 @@ int main() {
             break;
     }
     //infinity point
-    Point *pinf = new Point(big_, big_, big_ * big_, -1);
+    Point *pinf = new Point(1e9, 1e9, 1e9 * 1e9, -1);
     v.push_back(pinf);
 
     ConvexHull ch(v);
-    printf("%.9Lf", ch.answer());
+    printf("%.9Lf", ch.av_edges_voronoi());
 
     return 0;
 }
