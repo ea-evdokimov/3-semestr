@@ -66,7 +66,7 @@ struct Plane {
     }
 
     //видимость есть внешняя нормаль и вектор к точке направлены в одну сторону
-    bool is_visible(const Point<T> &p){
+    bool is_visible(const Point<T> &p) {
         Vector<T> v1(p1, p), norm = normal();
         //равно быть не может, так как любые 4 точки не лежат в одной плоскости
         visible = norm.dot_product(v1) > 0;
@@ -160,8 +160,9 @@ size_t ConvexHull<T>::hash_edge(Point<T> p1, Point<T> p2) {
         std::swap(p1, p2);
     }
 
-    size_t res = 1e15 * (p1.x + 500) + 1e12 * (p1.y + 500) + 1e9 * (p1.z + 500) + 1e6 * (p2.x + 500) + 1e3 * (p2.y + 500) +
-          (p2.z + 500);
+    size_t res =
+            1e15 * (p1.x + 500) + 1e12 * (p1.y + 500) + 1e9 * (p1.z + 500) + 1e6 * (p2.x + 500) + 1e3 * (p2.y + 500) +
+            (p2.z + 500);
 
     return res;
 }
@@ -173,24 +174,19 @@ void ConvexHull<T>::build() {
     if (base.is_visible(points[3]) == true)
         std::swap(points[3], points[2]);
 
-    //мучительно и внимательно собираем тетраэдр из первых четырех точек
-    planes.push_back(Plane<T>{points[0], points[1], points[2]});//0
-    planes.push_back(Plane<T>{points[0], points[3], points[1]});//1
-    planes.push_back(Plane<T>{points[0], points[2], points[3]});//2
-    planes.push_back(Plane<T>{points[1], points[3], points[2]});//3
+    std::vector<int> tetr_points = {0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2};
+    for (size_t i = 0; i < 12; i += 3) {
+        planes.push_back(Plane<T>{points[tetr_points[i]], points[tetr_points[i + 1]], points[tetr_points[i + 2]]});
+    }
 
-    edges.push_back(Edge<T>(0, 1, &(*planes.begin()), &(*(incr_iter<T>(1, planes.begin())))));
-    map_edges.insert({hash_edge(points[0], points[1]), &edges.back()});
-    edges.push_back(Edge<T>(1, 2, &(*planes.begin()), &(*(incr_iter<T>(3, planes.begin())))));
-    map_edges.insert({hash_edge(points[1], points[2]), &edges.back()});
-    edges.push_back(Edge<T>(1, 3, &(*(incr_iter<T>(3, planes.begin()))), &(*(incr_iter<T>(1, planes.begin())))));
-    map_edges.insert({hash_edge(points[1], points[3]), &edges.back()});
-    edges.push_back(Edge<T>(0, 3, &(*(incr_iter<T>(1, planes.begin()))), &(*(incr_iter<T>(2, planes.begin())))));
-    map_edges.insert({hash_edge(points[0], points[3]), &edges.back()});
-    edges.push_back(Edge<T>(0, 2, &(*(incr_iter<T>(2, planes.begin()))), &(*(planes.begin()))));
-    map_edges.insert({hash_edge(points[0], points[2]), &edges.back()});
-    edges.push_back(Edge<T>(2, 3, &(*(incr_iter<T>(2, planes.begin()))), &(*(incr_iter<T>(3, planes.begin())))));
-    map_edges.insert({hash_edge(points[2], points[3]), &edges.back()});
+    //мучительно и внимательно собираем тетраэдр из первых четырех точек
+    std::vector<int> tetr_edges = {0, 1, 0, 1, 1, 2, 0, 3, 1, 3, 3, 1, 0, 3, 1, 2, 0, 2, 2, 0, 2, 3, 2, 3};
+    for (size_t i = 0; i < 24; i += 4) {
+        edges.push_back(Edge<T>(tetr_edges[i], tetr_edges[i + 1],
+                                &(*(incr_iter<T>(tetr_edges[i + 2], planes.begin()))),
+                                &(*(incr_iter<T>(tetr_edges[i + 3], planes.begin())))));
+        map_edges.insert({hash_edge(points[tetr_edges[i]], points[tetr_edges[i + 1]]), &edges.back()});
+    }
 
     size_t n = points.size();
     for (size_t i = 4; i < n; ++i) {
@@ -351,3 +347,4 @@ int main() {
 
     return 0;
 }
+
