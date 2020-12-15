@@ -1,11 +1,19 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <iomanip>
 
 template<typename T>
 struct Point {
     T x, y;
+    friend std::istream& operator>> (std::istream &in, Point<T> &p){
+        in >> p.x;
+        in >> p.y;
+        return in;
+    }
 };
+
+enum quad{first = 1, second = 2, third = 3, forth = 4};
 
 template<typename T>
 struct Vector {
@@ -38,10 +46,10 @@ struct Vector {
     int quad() const {
         //определение четверти, в которой лежит вектор
         int v_x = b.x - a.x, v_y = b.y - a.y;
-        if (v_x < 0 && v_y < 0) return 1;
-        if (v_x >= 0 && v_y < 0) return 2;
-        if (v_x >= 0 && v_y >= 0) return 3;
-        if (v_x < 0 && v_y >= 0) return 4;
+        if (v_x < 0 && v_y < 0) return first;
+        if (v_x >= 0 && v_y < 0) return second;
+        if (v_x >= 0 && v_y >= 0) return third;
+        if (v_x < 0 && v_y >= 0) return forth;
         return 0;
     }
 
@@ -56,7 +64,7 @@ class Solution {
 private:
     std::vector<Point<T>> a_verts, b_verts;
 public:
-    Solution(std::vector<Point<T>> &a_v, std::vector<Point<T>> &b_v) :
+    Solution(std::vector<Point<T>> a_v, std::vector<Point<T>> b_v) :
             a_verts(std::move(a_v)), b_verts(std::move(b_v)) {}
 
     long double area(const std::vector<Point<T>> &verts);
@@ -96,7 +104,7 @@ long double Solution<T>::area_sum_of_mink() {
 
     std::sort(edges.begin(), edges.end());
 
-    Point<T> cur_v = edges[edges.size() - 1].a;
+    Point<T> cur_v = edges.back().a;
     std::vector<Point<T>> res;
     res.push_back(cur_v);
 
@@ -111,23 +119,23 @@ long double Solution<T>::area_sum_of_mink() {
 }
 
 int main() {
-    int64_t x, y;
+    Point<int64_t> p;
     size_t N;
     std::cin >> N;
     std::vector<Point<int64_t>> a_v, b_v;
     for (size_t i = 0; i < N; ++i) {
-        std::cin >> x >> y;
-        a_v.push_back(Point<int64_t>{x, y});
+        std::cin >> p;
+        a_v.push_back(p);
     }
 
     std::cin >> N;
     for (size_t i = 0; i < N; ++i) {
-        std::cin >> x >> y;
-        b_v.push_back(Point<int64_t>{x, y});
+        std::cin >> p;
+        b_v.push_back(p);
     }
 
     Solution<int64_t> s(a_v, b_v);
-    printf("%.6Lf", s.area_sum_of_mink());
 
+    std::cout << std::fixed << std::setprecision(6) << s.area_sum_of_mink() << '\n';
     return 0;
 }
