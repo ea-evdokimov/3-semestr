@@ -29,7 +29,7 @@ struct Cut {
         }
     }
 
-    T len() const {
+    T sq_len() const {
         return (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y);
     }
 
@@ -117,57 +117,53 @@ enum {
 template<typename T>
 class ScanLine {
 private:
-    std::vector<Cut<T>> cuts;
-    std::vector<Event<T>> event_queue;
-    std::set<Cut<T>> cur_cuts;
+    std::vector<Cut<T>> cuts_;
+    std::vector<Event<T>> event_queue_;
+    std::set<Cut<T>> cur_cuts_;
 
 public:
-    ScanLine(const std::vector<Cut<T>> &v) : cuts(std::move(v)) {}
+    ScanLine(const std::vector<Cut<T>> &v) : cuts_(std::move(v)) {}
 
-    std::pair<int64_t, int64_t> find_intersects();
+    std::optional<std::pair<int64_t, int64_t>> find_intersects();
 };
 
 template<typename T>
-std::pair<int64_t, int64_t> ScanLine<T>::find_intersects() {
-    std::pair<int64_t, int64_t> result = {-1, -1};
+std::optional<std::pair<int64_t, int64_t>> ScanLine<T>::find_intersects() {
     //заполняем массив все событий
-    for (size_t i = 0; i < cuts.size(); ++i) {
+    for (size_t i = 0; i < cuts_.size(); ++i) {
         //добавление отрезка
-        event_queue.push_back(Event<T>(cuts[i].a.x, CUT_START, i));
+        event_queue_.push_back(Event<T>(cuts_[i].a.x, CUT_START, i));
         //удаление отрезка
-        event_queue.push_back(Event<T>(cuts[i].b.x, CUT_END, i));
+        event_queue_.push_back(Event<T>(cuts_[i].b.x, CUT_END, i));
     }
 
-    std::sort(event_queue.begin(), event_queue.end());
+    std::sort(event_queue_.begin(), event_queue_.end());
 
     //обработка событий
-    for (size_t i = 0; i < event_queue.size(); ++i) {
-        int cur_id = event_queue[i].id;
+    for (size_t i = 0; i < event_queue_.size(); ++i) {
+        int cur_id = event_queue_[i].id;
 
-        typename std::set<Cut<T>>::iterator above = cur_cuts.lower_bound(cuts[cur_id]),
-                below = cur_cuts.upper_bound(cuts[cur_id]);
+        typename std::set<Cut<T>>::iterator above = cur_cuts_.lower_bound(cuts_[cur_id]),
+                below = cur_cuts_.upper_bound(cuts_[cur_id]);
 
-        if (event_queue[i].type == CUT_START) {
+        if (event_queue_[i].type == CUT_START) {
             //рассматриваем предыдущий и следующий относительно рассмотриваемого отрезки
-            if (above != cur_cuts.end() && intersect(cuts[cur_id], *above)) {
-                result = {above->id, cur_id};
-                break;
-            } else if (below != cur_cuts.end() && intersect(cuts[cur_id], *below)) {
-                result = {below->id, cur_id};
-                break;
+            if (above != cur_cuts_.end() && intersect(cuts_[cur_id], *above)) {
+                return above->id < cur_id ? std::make_pair(above->id, cur_id) : std::make_pair(cur_id, above->id);
+            } else if (below != cur_cuts_.end() && intersect(cuts_[cur_id], *below)) {
+                return below->id < cur_id ? std::make_pair(below->id, cur_id) : std::make_pair(cur_id, below->id);
             }
-            cur_cuts.insert(cuts[cur_id]);
-        } else if (event_queue[i].type == CUT_END) {
+            cur_cuts_.insert(cuts_[cur_id]);
+        } else if (event_queue_[i].type == CUT_END) {
             //рассматриваем предыдущий и следующий относительно рассмотриваемого отрезки
-            if (above != cur_cuts.end() && below != cur_cuts.end() && above != below && intersect(*below, *above)) {
-                result = {above->id, below->id};
-                break;
+            if (above != cur_cuts_.end() && below != cur_cuts_.end() && above != below && intersect(*below, *above)) {
+                return above->id < below->id ? std::make_pair(above->id, below->id) : std::make_pair(below->id, above->id);
             }
 
-            cur_cuts.erase(cuts[cur_id]);
+            cur_cuts_.erase(cuts_[cur_id]);
         }
     }
-    return result;
+    return std::nullopt;
 }
 
 int main() {
@@ -186,16 +182,12 @@ int main() {
     }
 
     ScanLine<int64_t> s(v);
-    auto result = s.find_intersects();
-    if (result.first == -1) {
-        std::cout << "NO" << '\n';
-    } else {
-        if (result.first > result.second)
-            std::swap(result.first, result.second);
 
-        std::cout << "YES" << '\n';
-        std::cout << result.first + 1 << ' ' << result.second + 1 << '\n';
-    }
+    auto ids = s.find_intersects();
+    if(ids)
+        std::cout << "YES\n" << ids->first + 1 << " " << ids->second + 1;
+    else
+        std::cout << "NO\n";
 
     return 0;
 }
