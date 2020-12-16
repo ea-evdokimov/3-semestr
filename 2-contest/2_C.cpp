@@ -6,19 +6,14 @@
 #include <algorithm>
 
 template<typename T>
-T min3(T a, T b, T c) {
-    return std::min(std::min(a, b), std::min(b, c));
-}
-
-template<typename T>
 struct Point {
     T x, y, z;
     int id;
 
-    Point(T x_, T y_, T z_, int id_ = -1) : x(x_), y(y_), z(z_), id(id_) {}
+    Point(T x, T y, T z, int id_ = -1) : x(x), y(y), z(z), id(id_) {}
 
     bool operator==(const Point &q) const {
-        return x == q.x && y == q.y && z == q.z;
+        return std::tie(x, y, z) == std::tie(q.x, q.y, q.z);
     }
 };
 
@@ -37,7 +32,7 @@ struct Vector {
         return Vector<T>(y * b.z - z * b.y, z * b.x - x * b.z, x * b.y - y * b.x);
     }
 
-    T len() const {
+    T sq_len() const {
         return x * x + y * y + z * z;
     }
 
@@ -60,7 +55,7 @@ struct Plane {
         return v12.cross_product(v23);
     }
 
-    bool is_consist(const Point<T> p) const {
+    bool consist(const Point<T> p) const {
         Vector<T> norm = normal(), v1(p, p1);
         return norm.dot_product(v1) == 0;
     }
@@ -79,9 +74,9 @@ struct Plane {
 
     void normalize() {
         //чтобы наименьшая точка стояла первой
-        if (p1.id == min3(p1.id, p2.id, p3.id)) {
+        if (p1.id == std::min({p1.id, p2.id, p3.id})) {
             return;
-        } else if (p2.id == min3(p1.id, p2.id, p3.id)) {
+        } else if (p2.id == std::min({p1.id, p2.id, p3.id})) {
             Point<T> tmp = p1;
             p1 = p2;
             p2 = p3;
@@ -106,13 +101,16 @@ struct Plane {
 template<typename T>
 struct Edge {
     //это пересечение двух каких-то граней
-    //номера вершин в массиве points
+    //номера вершин в массиве points_
     int p1, p2;
     //их номера
     Plane<T> *first_ptr, *second_ptr;
 
     Edge(int p, int q, Plane<T> *ptr1 = nullptr, Plane<T> *ptr2 = nullptr) : p1(p), p2(q), first_ptr(ptr1),
                                                                              second_ptr(ptr2) {}
+    bool operator==(const Edge &e){
+        return (p1 == e.p1 && p2 == e.p2) || (p1 == e.p2 && p2 == e.p1);
+    }
 };
 
 //для инкрементирования итератора
@@ -130,17 +128,15 @@ bool comp(const Plane<int32_t> &p, const Plane<int32_t> &q) {
         return p.p1.id < q.p1.id;
 }
 
+
+
 template<typename T>
 class ConvexHull {
 private:
-    std::vector<Point<T>> points;
-    std::list<Plane<T>> planes;
-    std::list<Edge<T>> edges;
-    std::unordered_map<size_t, Edge<T> *> map_edges;
-public:
-    ConvexHull(std::vector<Point<T>> &v) : points(std::move(v)) {
-        build();
-    }
+    std::vector<Point<T>> points_;
+    std::list<Plane<T>> planes_;
+    std::list<Edge<T>> edges_;
+    std::unordered_map<size_t, Edge<T> *> map_edges_;
 
     void build();
 
@@ -149,6 +145,10 @@ public:
     void link_plane(Edge<T> *edge, Plane<T> *plane);
 
     size_t hash_edge(Point<T> p1, Point<T> p2);
+public:
+    ConvexHull(std::vector<Point<T>> &v) : points_(std::move(v)) {
+        build();
+    }
 
     void print_hull();
 };
@@ -170,35 +170,36 @@ size_t ConvexHull<T>::hash_edge(Point<T> p1, Point<T> p2) {
 template<typename T>
 void ConvexHull<T>::build() {
     //проверка первых точек на правильность нормали
-    Plane<T> base{points[0], points[1], points[2]};
-    if (base.is_visible(points[3]) == true)
-        std::swap(points[3], points[2]);
+    Plane<T> base{points_[0], points_[1], points_[2]};
+    if (base.is_visible(points_[3]) == true)
+        std::swap(points_[3], points_[2]);
 
     std::vector<int> tetr_points = {0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2};
-    for (size_t i = 0; i < 12; i += 3) {
-        planes.push_back(Plane<T>{points[tetr_points[i]], points[tetr_points[i + 1]], points[tetr_points[i + 2]]});
+    for (size_t i = 0; i < tetr_points.size(); i += 3) {
+        planes_.push_back(Plane<T>{points_[tetr_points[i]], points_[tetr_points[i + 1]], points_[tetr_points[i + 2]]});
     }
 
     //мучительно и внимательно собираем тетраэдр из первых четырех точек
     std::vector<int> tetr_edges = {0, 1, 0, 1, 1, 2, 0, 3, 1, 3, 3, 1, 0, 3, 1, 2, 0, 2, 2, 0, 2, 3, 2, 3};
-    for (size_t i = 0; i < 24; i += 4) {
-        edges.push_back(Edge<T>(tetr_edges[i], tetr_edges[i + 1],
-                                &(*(incr_iter<T>(tetr_edges[i + 2], planes.begin()))),
-                                &(*(incr_iter<T>(tetr_edges[i + 3], planes.begin())))));
-        map_edges.insert({hash_edge(points[tetr_edges[i]], points[tetr_edges[i + 1]]), &edges.back()});
+    for (size_t i = 0; i < tetr_edges.size(); i += 4) {
+        edges_.push_back(Edge<T>(tetr_edges[i], tetr_edges[i + 1],
+                                &(*(incr_iter<T>(tetr_edges[i + 2], planes_.begin()))),
+                                &(*(incr_iter<T>(tetr_edges[i + 3], planes_.begin())))));
+        map_edges_.insert({hash_edge(points_[tetr_edges[i]], points_[tetr_edges[i + 1]]), &edges_.back()});
+
     }
 
-    size_t n = points.size();
+    size_t n = points_.size();
     for (size_t i = 4; i < n; ++i) {
         //проход по всем граням
-        for (auto &plane : planes) {
+        for (auto &plane : planes_) {
             //устанавливаем видимость каждой грани
-            plane.is_visible(points[i]);
+            plane.is_visible(points_[i]);
         }
 
         //проход по всем ребрам
-        auto it = edges.begin();
-        while (it != edges.end()) {
+        auto it = edges_.begin();
+        while (it != edges_.end()) {
             auto &cur_e = *it;
             //скипаем недоработанные ребра(которые были добавлены на эом шаге)
             if (cur_e.first_ptr == nullptr || cur_e.second_ptr == nullptr) {
@@ -208,48 +209,48 @@ void ConvexHull<T>::build() {
             if (cur_e.first_ptr->visible == true && cur_e.second_ptr->visible == false) {
                 int num1, num2, num3;
                 //направление текщушего ребра в новой должно совпадать с направлением ребра в видимой грани
-                if (cur_e.first_ptr->direct(points[cur_e.p1], points[cur_e.p2])) {
-                    planes.push_back(Plane<T>{points[cur_e.p1], points[cur_e.p2], points[i]});
+                if (cur_e.first_ptr->direct(points_[cur_e.p1], points_[cur_e.p2])) {
+                    planes_.push_back(Plane<T>{points_[cur_e.p1], points_[cur_e.p2], points_[i]});
                     num1 = cur_e.p1;
                     num2 = cur_e.p2;
                     num3 = i;
                 } else {
-                    planes.push_back(Plane<T>{points[cur_e.p2], points[cur_e.p1], points[i]});
+                    planes_.push_back(Plane<T>{points_[cur_e.p2], points_[cur_e.p1], points_[i]});
                     num1 = cur_e.p2;
                     num2 = cur_e.p1;
                     num3 = i;
                 }
                 //добавили грань, изменяем текущее ребро
-                cur_e.first_ptr = &(planes.back());
+                cur_e.first_ptr = &(planes_.back());
                 //пытаемся добавить новые потенциальные ребра
-                try_add_edges(&planes.back(), num1, num2, num3);
+                try_add_edges(&planes_.back(), num1, num2, num3);
 
                 ++it;
             } else if (cur_e.first_ptr->visible == false && cur_e.second_ptr->visible == true) {
                 //аналогично
                 int num1, num2, num3;
                 //направление текщушего ребра в новой должно совпадать с направлением ребра в видимой грани
-                if (cur_e.second_ptr->direct(points[cur_e.p1], points[cur_e.p2])) {
-                    planes.push_back(Plane<T>{points[cur_e.p1], points[cur_e.p2], points[i]});
+                if (cur_e.second_ptr->direct(points_[cur_e.p1], points_[cur_e.p2])) {
+                    planes_.push_back(Plane<T>{points_[cur_e.p1], points_[cur_e.p2], points_[i]});
                     num1 = cur_e.p1;
                     num2 = cur_e.p2;
                     num3 = i;
                 } else {
-                    planes.push_back(Plane<T>{points[cur_e.p2], points[cur_e.p1], points[i]});
+                    planes_.push_back(Plane<T>{points_[cur_e.p2], points_[cur_e.p1], points_[i]});
                     num1 = cur_e.p2;
                     num2 = cur_e.p1;
                     num3 = i;
                 }
                 //добавили грань, изменяем текущее ребро
-                cur_e.second_ptr = &(planes.back());
+                cur_e.second_ptr = &(planes_.back());
                 //пытаемся добавить новые потенциальные ребра
-                try_add_edges(&planes.back(), num1, num2, num3);
+                try_add_edges(&planes_.back(), num1, num2, num3);
 
                 ++it;
             } else if (cur_e.first_ptr->visible == true && cur_e.second_ptr->visible == true) {
                 //иначе это две видимые грани и это ребро не нужно
-                it = edges.erase(it);
-                map_edges.erase(hash_edge(points[cur_e.p1], points[cur_e.p2]));
+                it = edges_.erase(it);
+                map_edges_.erase(hash_edge(points_[cur_e.p1], points_[cur_e.p2]));
                 continue;
             } else
                 ++it;
@@ -257,11 +258,11 @@ void ConvexHull<T>::build() {
         }
 
         //за линию удаляем все видимые грани
-        auto iti = planes.begin();
-        while (iti != planes.end()) {
+        auto iti = planes_.begin();
+        while (iti != planes_.end()) {
             //если грань была видна, удаляем ее за O(1)
             if ((*iti).visible == true)
-                iti = planes.erase(iti);
+                iti = planes_.erase(iti);
             else
                 ++iti;
         }
@@ -275,25 +276,25 @@ void ConvexHull<T>::try_add_edges(Plane<T> *plane, int num1, int num2, int num3)
             hash2 = hash_edge(plane->p2, plane->p3),
             hash3 = hash_edge(plane->p3, plane->p1);
 
-    if (map_edges.find(hash1) != map_edges.end()) {
-        link_plane(map_edges[hash1], plane);
+    if (map_edges_.find(hash1) != map_edges_.end()) {
+        link_plane(map_edges_[hash1], plane);
     } else {
-        edges.push_back(Edge<T>(num1, num2, plane));
-        map_edges.insert({hash1, &edges.back()});
+        edges_.push_back(Edge<T>(num1, num2, plane));
+        map_edges_.insert({hash1, &edges_.back()});
     }
 
-    if (map_edges.find(hash2) != map_edges.end()) {
-        link_plane(map_edges[hash2], plane);
+    if (map_edges_.find(hash2) != map_edges_.end()) {
+        link_plane(map_edges_[hash2], plane);
     } else {
-        edges.push_back(Edge<T>(num2, num3, plane));
-        map_edges.insert({hash2, &edges.back()});
+        edges_.push_back(Edge<T>(num2, num3, plane));
+        map_edges_.insert({hash2, &edges_.back()});
     }
 
-    if (map_edges.find(hash3) != map_edges.end()) {
-        link_plane(map_edges[hash3], plane);
+    if (map_edges_.find(hash3) != map_edges_.end()) {
+        link_plane(map_edges_[hash3], plane);
     } else {
-        edges.push_back(Edge<T>(num3, num1, plane));
-        map_edges.insert({hash3, &edges.back()});
+        edges_.push_back(Edge<T>(num3, num1, plane));
+        map_edges_.insert({hash3, &edges_.back()});
     }
 }
 
@@ -316,14 +317,14 @@ template<typename T>
 void ConvexHull<T>::print_hull() {
     int num = 0;
 
-    for (auto &plane : planes) {
+    for (auto &plane : planes_) {
         plane.normalize();
         ++num;
     }
-    planes.sort(comp);
+    planes_.sort(comp);
 
     std::cout << num << "\n";
-    for (auto plane : planes) {
+    for (auto plane : planes_) {
         plane.print();
     }
 }
