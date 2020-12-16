@@ -4,21 +4,38 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <iomanip>
+
+enum event_type{
+    w_left_u = 0,
+    w_right_v = 1,
+    u_minus_uv_cw = 2,
+    uu_plus_v_ccw = 3,
+    uvv_pus_cw = 4,
+    uv_minus_v_ccw = 5
+};
 
 struct Point {
     long double x, y, z;
-    static constexpr double big = 1e50;
-    static constexpr double epsilon = 1e-6;
+    static constexpr double INF = 1e50;
+    static constexpr double EPSLN = 1e-6;
     int64_t id;
     Point *prev, *next;
 
-    Point() : x(big), y(big), z(big), id(-1), prev(nullptr), next(nullptr) {}
+    Point() : x(INF), y(INF), z(INF), id(-1), prev(nullptr), next(nullptr) {}
 
     Point(long double x_, long double y_, long double z_, int id_ = -1, Point *p = nullptr, Point *n = nullptr) :
             x(x_), y(y_), z(z_), id(id_), prev(p), next(n) {}
 
     bool operator==(const Point &q) const {
-        return (std::abs(x - q.x) < epsilon) && (std::abs(y - q.y) < epsilon) && (std::abs(z - q.z) < epsilon);
+        return (std::abs(x - q.x) < EPSLN) && (std::abs(y - q.y) < EPSLN) && (std::abs(z - q.z) < EPSLN);
+    }
+
+    friend std::istream& operator>> (std::istream &in, Point &p){
+        in >> p.x;
+        in >> p.y;
+        in >> p.z;
+        return in;
     }
 
     void fix_links() {
@@ -47,9 +64,13 @@ class ConvexHull {
 private:
     std::vector<Point *> all_points;
     std::vector<Plane> planes;
-    static constexpr double big = 1e50;
+    static constexpr double INF = 1e50;
+    Point PINF = Point(1e9, 1e9, 1e9 * 1e9, -1);
 public:
-    ConvexHull(std::vector<Point *> &v) : all_points(std::move(v)) {
+    ConvexHull(const std::vector<Point *> &v) : all_points(v) {
+        //infinity point
+        all_points.push_back(&PINF);
+
         //sort by x
         std::sort(all_points.begin(), all_points.end(), compare);
 
@@ -68,7 +89,8 @@ public:
 
     ~ConvexHull() {
         for (int i = all_points.size() - 1; i >= 0; --i) {
-            delete (all_points[i]);
+            if(all_points[i]->id != -1)
+                delete (all_points[i]);
         }
     }
 
@@ -83,7 +105,7 @@ public:
         std::cout << "\n";
     }
 
-    void add_planes(std::vector<Point *> &point_seq) {
+    void add_planes(const std::vector<Point *> &point_seq) {
         for (Point *p : point_seq) {
             Plane cur = Plane{p->prev->id, p->id, p->next->id};
             p->fix_links();
@@ -102,10 +124,10 @@ public:
     //time of event when angle changes
     static long double event(const Point *p, const Point *p1, const Point *p2) {
         if (p == nullptr || p1 == nullptr || p2 == nullptr)
-            return big;
+            return INF;
         long double a = angle(p, p1, p2);
         if (a == 0) {
-            return big;
+            return INF;
         }
         return ((p2->z - p->z) * (p1->x - p->x) - (p2->x - p->x) * (p1->z - p->z)) / a;
     }
@@ -144,8 +166,8 @@ ConvexHull::hull(const std::vector<Point *> &left, const std::vector<Point *> &r
     //now uv is first bridge
     size_t i = 0, j = 0, type;
 
-    long double old_time = -big, new_time;
-    std::vector<long double> t(6, big);
+    long double old_time = -INF, new_time;
+    std::vector<long double> t(6, INF);
     while (1) {
         //according to original article 6 types of events when we need change
         if (i < left.size())
@@ -157,7 +179,7 @@ ConvexHull::hull(const std::vector<Point *> &left, const std::vector<Point *> &r
         t[4] = event(u, v, v->next);
         t[5] = event(u, v->prev, v);
 
-        new_time = big;
+        new_time = INF;
 
         //finding min time when we need changes
         for (int ti = 0; ti < 6; ++ti) {
@@ -167,12 +189,12 @@ ConvexHull::hull(const std::vector<Point *> &left, const std::vector<Point *> &r
             }
         }
         //if no such, break
-        if (new_time == big)
+        if (new_time == INF)
             break;
         //merge
         switch (type) {
             // 6 types of events
-            case 0:
+            case w_left_u:
                 //if w is to the left of u, A undergoes the same event
                 if (left[i]->x < u->x) {
                     res.push_back(left[i]);
@@ -180,7 +202,7 @@ ConvexHull::hull(const std::vector<Point *> &left, const std::vector<Point *> &r
                 left[i]->fix_links();
                 ++i;
                 break;
-            case 1:
+            case w_right_v:
                 //if w is to the right of v, B undergoes the same event
                 if (right[j]->x > v->x) {
                     res.push_back(right[j]);
@@ -188,19 +210,19 @@ ConvexHull::hull(const std::vector<Point *> &left, const std::vector<Point *> &r
                 right[j]->fix_links();
                 ++j;
                 break;
-            case 2:
+            case u_minus_uv_cw:
                 res.push_back(u);
                 u = u->prev;
                 break;
-            case 3:
+            case uu_plus_v_ccw:
                 u = u->next;
                 res.push_back(u);
                 break;
-            case 4:
+            case uvv_pus_cw:
                 res.push_back(v);
                 v = v->next;
                 break;
-            case 5:
+            case uv_minus_v_ccw:
                 v = v->prev;
                 res.push_back(v);
                 break;
@@ -302,23 +324,14 @@ int main() {
     long double x, y;
     std::vector<Point *> v;
 
-    int64_t i = 0, ret_scan = 1;
-    while (ret_scan != EOF) {
-        ret_scan = scanf("%Lf %Lf", &x, &y);
-
-        if (ret_scan != EOF) {
-            Point *p = new Point(x, y, x * x + y * y, i);
-            v.push_back(p);
-            ++i;
-        } else
-            break;
+    int64_t i = 0;
+    while (std::cin >> x >> y) {
+        Point *p = new Point(x, y, x * x + y * y, i);
+        v.push_back(p);
+        ++i;
     }
-    //infinity point
-    Point *pinf = new Point(1e9, 1e9, 1e9 * 1e9, -1);
-    v.push_back(pinf);
 
     ConvexHull ch(v);
-    printf("%.9Lf", ch.av_edges_voronoi());
-
+    std::cout << std::setprecision(9) << ch.av_edges_voronoi() << '\n';
     return 0;
 }
