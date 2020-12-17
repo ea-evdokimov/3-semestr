@@ -108,9 +108,6 @@ struct Edge {
 
     Edge(int p, int q, Plane<T> *ptr1 = nullptr, Plane<T> *ptr2 = nullptr) : p1(p), p2(q), first_ptr(ptr1),
                                                                              second_ptr(ptr2) {}
-    bool operator==(const Edge &e){
-        return (p1 == e.p1 && p2 == e.p2) || (p1 == e.p2 && p2 == e.p1);
-    }
 };
 
 //для инкрементирования итератора
@@ -122,13 +119,8 @@ typename std::list<Plane<T>>::iterator incr_iter(int i, typename std::list<Plane
 }
 
 bool comp(const Plane<int32_t> &p, const Plane<int32_t> &q) {
-    if (p.p1.id == q.p1.id) {
-        return p.p2.id == q.p2.id ? p.p3.id < q.p3.id : p.p2.id < q.p2.id;
-    } else
-        return p.p1.id < q.p1.id;
+    return std::tie(p.p1.id, p.p2.id, p.p3.id) < std::tie(q.p1.id, q.p2.id, q.p3.id);
 }
-
-
 
 template<typename T>
 class ConvexHull {
@@ -146,10 +138,22 @@ private:
 
     size_t hash_edge(Point<T> p1, Point<T> p2);
 public:
-    ConvexHull(std::vector<Point<T>> &v) : points_(std::move(v)) {
-        build();
-    }
+    ConvexHull(std::vector<Point<T>> &v);
+    friend std::ostream& operator<< (std::ostream &out, ConvexHull<T> &h){
+        int num = 0;
 
+        for (auto &plane : h.planes_) {
+            plane.normalize();
+            ++num;
+        }
+        h.planes_.sort(comp);
+
+        std::cout << num << "\n";
+        for (auto plane : h.planes_) {
+            plane.print();
+        }
+        return out;
+    }
     void print_hull();
 };
 
@@ -168,7 +172,7 @@ size_t ConvexHull<T>::hash_edge(Point<T> p1, Point<T> p2) {
 }
 
 template<typename T>
-void ConvexHull<T>::build() {
+ConvexHull<T>::ConvexHull(std::vector<Point<T>> &v) : points_(std::move(v)) {
     //проверка первых точек на правильность нормали
     Plane<T> base{points_[0], points_[1], points_[2]};
     if (base.is_visible(points_[3]) == true)
@@ -182,11 +186,10 @@ void ConvexHull<T>::build() {
     //мучительно и внимательно собираем тетраэдр из первых четырех точек
     std::vector<int> tetr_edges = {0, 1, 0, 1, 1, 2, 0, 3, 1, 3, 3, 1, 0, 3, 1, 2, 0, 2, 2, 0, 2, 3, 2, 3};
     for (size_t i = 0; i < tetr_edges.size(); i += 4) {
-        edges_.push_back(Edge<T>(tetr_edges[i], tetr_edges[i + 1],
-                                &(*(incr_iter<T>(tetr_edges[i + 2], planes_.begin()))),
-                                &(*(incr_iter<T>(tetr_edges[i + 3], planes_.begin())))));
+        auto pt1 = planes_.begin(), pt2 = planes_.begin();
+        std::advance(pt1, tetr_edges[i + 2]), std::advance(pt2, tetr_edges[i + 3]);
+        edges_.push_back(Edge<T>(tetr_edges[i], tetr_edges[i + 1], &(*(pt1)), &(*(pt2))));
         map_edges_.insert({hash_edge(points_[tetr_edges[i]], points_[tetr_edges[i + 1]]), &edges_.back()});
-
     }
 
     size_t n = points_.size();
@@ -313,22 +316,6 @@ void ConvexHull<T>::link_plane(Edge<T> *edge, Plane<T> *plane) {
     }
 }
 
-template<typename T>
-void ConvexHull<T>::print_hull() {
-    int num = 0;
-
-    for (auto &plane : planes_) {
-        plane.normalize();
-        ++num;
-    }
-    planes_.sort(comp);
-
-    std::cout << num << "\n";
-    for (auto plane : planes_) {
-        plane.print();
-    }
-}
-
 int main() {
     size_t N, M;
     std::cin >> M;
@@ -343,7 +330,7 @@ int main() {
         }
 
         ConvexHull<int32_t> ch(v);
-        ch.print_hull();
+        std::cout << ch;
     }
 
     return 0;
