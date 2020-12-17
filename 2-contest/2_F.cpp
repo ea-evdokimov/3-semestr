@@ -99,10 +99,11 @@ public:
     std::vector<Point *>
     hull(const std::vector<Point *> &left, const std::vector<Point *> &right, Point *from_left, Point *from_right);
 
-    void print_hull() const {
-        for (auto p : planes)
+    friend std::ostream& operator<< (std::ostream &out, ConvexHull &h){
+        for (auto p : h.planes)
             std::cout << p.p1 << " " << p.p2 << " " << p.p3 << "\n";
         std::cout << "\n";
+        return out;
     }
 
     void add_planes(const std::vector<Point *> &point_seq) {
@@ -117,7 +118,7 @@ public:
     static long double angle(const Point *p, const Point *p1, const Point *p2) {
         if (p == nullptr || p1 == nullptr || p2 == nullptr)
             return 1.0;
-
+-
         return (p2->y - p->y) * (p1->x - p->x) - (p2->x - p->x) * (p1->y - p->y);
     }
 
