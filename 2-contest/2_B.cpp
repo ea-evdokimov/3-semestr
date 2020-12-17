@@ -10,7 +10,7 @@ template<typename T>
 struct Point{
     T x, y;
 
-    T sq_len(const Point &a){
+    T sq_len(const Point &a) const {
         return (a.x - x) * (a.x - x) + (a.y - y) * (a.y - y);
     }
     friend std::istream& operator>> (std::istream &in, Point<T> &p){
@@ -18,7 +18,6 @@ struct Point{
         in >> p.y;
         return in;
     }
-
 };
 
 template<typename T>
@@ -36,9 +35,10 @@ public:
 
     void build_convex_hull();
 
-    void print_convex_hull(){
-        for(auto i : convex_hull)
-            std::cout << "(" << i.x << ";" <<  i.y << ")" << " ";
+    friend std::ostream& operator<< (std::ostream &out, Hull2D<T> &h){
+        for(auto i : h.convex_hull)
+            out << "(" << i.x << ";" <<  i.y << ")" << " ";
+        return out;
     }
 
     double sum_len(){
@@ -50,7 +50,6 @@ public:
         return res;
     }
 };
-
 
 template<typename T>
 void Hull2D<T>::build_convex_hull(){
