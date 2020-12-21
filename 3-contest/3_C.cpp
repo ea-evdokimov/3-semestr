@@ -1,38 +1,32 @@
 #include <vector>
-#include <algorithm>
 #include <iostream>
 
-int mex(std::vector<int> &curs){
-    int res = 0;
-    std::sort(curs.begin(), curs.end());
-    
-    for(int i = 0; i < curs.size(); ++i){
-        if(res == curs[i]){
-            while(i < curs.size() && curs[i] == res)
-                ++i;
-            ++res, --i;
-            continue;
-        }
-        else
-            return res;
+size_t mex(const std::vector<int> &cur){
+    std::vector<int> exist(cur.size() + 1, 0);
+    for(auto i : cur){
+        if (i <= cur.size())
+            exist[i] = 1;
     }
-    return res;
+    for(size_t j = 0; j < exist.size(); ++j){
+        if(!exist[j])
+            return j;
+    }
 }
 
-void algo(int n){
-    std::vector<int> SG(n + 1, 0), curs;
+void algo(size_t n){
+    std::vector<int> SG(n + 1, 0), cur;
 
-    for(int i = 2; i <= n; ++i){
-        curs.push_back(SG[i-1]);
-        for(int j = 1; j <= i - 2; ++j)
-            curs.push_back(SG[j] ^ SG[i - j - 1]);
-        SG[i] = mex(curs);
-        curs.clear();
+    for(size_t i = 2; i <= n; ++i){
+        cur.push_back(SG[i-1]);
+        for(size_t j = 1; j <= i - 2; ++j)
+            cur.push_back(SG[j] ^ SG[i - j - 1]);
+        SG[i] = mex(cur);
+        cur.clear();
     }
-    
+
     if(SG[n] != 0){
         std::cout << "Schtirlitz" << "\n";
-        for(int t = 1; t <= n; ++t){
+        for(size_t t = 1; t <= n; ++t){
             if((SG[t - 1] ^ SG[n - t]) == 0)
                 std::cout << t << "\n";
         }
@@ -42,7 +36,7 @@ void algo(int n){
 }
 
 int main(){
-    int n; std::cin >> n;
+    size_t n; std::cin >> n;
     algo(n);
     return 0;
 }
